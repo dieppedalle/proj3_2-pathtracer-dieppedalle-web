@@ -1,0 +1,396 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 284A Ray Tracing</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+<body>
+<br />
+<h1 align="middle">CS 284A: Computer Graphics and Imaging, Spring 2018</h1>
+<h1 align="middle">Assignment 3: PathTracer</h1>
+<h2 align="middle">Gauthier Dieppedalle, CS199-btx</h2>
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+</script>
+<script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+
+<h2 align="middle">Overview</h2>
+<p>In this project, I added more ray tracing features to project 3-1. I first developed some bsdf for more complicated materials: mirror, glass, and microfacet materials. I then supported environment light and depth of field. I lastly implemented some shaders in Node.js.</p>
+
+    <h2 align="middle">Part 1: Mirror and Glass Materials</h2>
+        <p>The following images are rendered at 64 samples per pixel and 4 samples per light:</p>
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/spheres0.png" align="middle" width="400px"/>
+                <figcaption align="middle"><code>dae/sky/CBspheres.dae</code> rendered in 2.3035s for 0 bounces.</figcaption>
+              </td>
+              <td>
+                <img src="images/spheres1.png" align="middle" width="400px"/>
+                <figcaption align="middle"><code>dae/sky/CBspheres.dae</code> rendered in 18.7675s for 1 bounce.</figcaption>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <img src="images/spheres2.png" align="middle" width="400px"/>
+                <figcaption align="middle"><code>dae/sky/CBspheres.dae</code> rendered in 45.1851s for 2 bounces.</figcaption>
+              </td>
+              <td>
+                <img src="images/spheres3.png" align="middle" width="400px"/>
+                <figcaption align="middle"><code>dae/sky/CBspheres.dae</code> rendered in 65.3517s for 3 bounces.</figcaption>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <img src="images/spheres4.png" align="middle" width="400px"/>
+                <figcaption align="middle"><code>dae/sky/CBspheres.dae</code> rendered in 82.1884s for 4 bounces.</figcaption>
+              </td>
+              <td>
+                <img src="images/spheres5.png" align="middle" width="400px"/>
+                <figcaption align="middle"><code>dae/sky/CBspheres.dae</code> rendered in 87.2691s for 5 bounces.</figcaption>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <img src="images/spheres100.png" align="middle" width="400px"/>
+                <figcaption align="middle"><code>dae/sky/CBspheres.dae</code> rendered in 142.4185s for 100 bounces.</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+      <p>We can see that in the zero bounce case, we can only see the light reflection from the source and the rest of the scene is all black. In the one bounce case, we can see that the light is simply going to each object and bouncing to the user eye. We can only see the color of the walls and floor. In the 2 bounce case, we can see that all objects are visible but there is no refraction (the light on the mirror ball is simply bouncing once to show the color of the direct bounce, the glass ball has no refraction so the light is not bouncing inside and is therefore all black). In the 3 bounce case, we can see that we now have reflected light and can see the colors of the glass ball. In the 4 bounces case we can see that the light under the glass ball is getting reflected at it's exit in the bottom of the ball to the floor. As a result, there is a white patch under the white ball. In the 5 bounces cases the light from the glass ball is getting reflected to the blue wall and we can see a small light patch on the right of the image. In the 100 bounces image we can see that the image is almost the same as the 5 bounces cases. There is slightly more light on the reflection of the light on the glass ball.</p>
+    <h2 align="middle">Part 2: Microfacet Material</h2>
+    <p>I then rendered a sequence of 4 images of scene <code>CBdragon_microfacet_au.dae</code> rendered with $\alpha$ set to 0.005, 0.05, 0.25 and 0.5. The following images are rendered at using 128 samples per pixel, 1 samples per light, and a maximum number of bounces of 5:</p>
+    <div align="middle">
+      <table style="width=100%">
+        <tr>
+          <td>
+            <img src="images/dragon05.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>dae/sky/CBdragon_microfacet_au.dae</code> rendered in 94.9465s using $\alpha=0.5$.</figcaption>
+          </td>
+          <td>
+            <img src="images/dragon025.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>dae/sky/CBdragon_microfacet_au.dae</code> rendered in 94.1156s using $\alpha=0.25$.</figcaption>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <img src="images/dragon005.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>dae/sky/CBdragon_microfacet_au.dae</code> rendered in 98.6982s using $\alpha=0.05$.</figcaption>
+          </td>
+          <td>
+            <img src="images/dragon0005.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>dae/sky/CBdragon_microfacet_au.dae</code> rendered in 95.1815s using $\alpha=0.005$.</figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <p>According to the instructions, $\alpha$ represents the roughness of the macro surface. When the $\alpha$ is low at 0.005, the dragon is very dark and shiny. As the $\alpha$ becomes larger such at 0.05, the image dragon gets slighlty rougher and lighter. At $\alpha=0.25$, the dragon is again a bit more rough and has more of a golden color. At $\alpha=0.5$, the dragon is golden and seems to be very rough.</p>
+    
+    <p>The following are two images of <code>dae/sky/CBbunny_microfacet_cu.dae</code> with 64 samples per pixel, 1 samples per light, and a maximum number of bounces of 5:</p>
+    <div align="middle">
+      <table style="width=100%">
+        <tr>
+          <td>
+            <img src="images/bunnyHemisphere.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>dae/sky/CBbunny_microfacet_cu.dae</code> rendered using cosine hemisphere sampling.</figcaption>
+          </td>
+          <td>
+            <img src="images/bunnyIS.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>dae/sky/CBbunny_microfacet_cu.dae</code> rendered using importance sampling.</figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <p>We can see that by using cosine hemisphere sampling the image has more noise and the bunny is darker then when using importance sampling.</p>
+    
+    <p>I decided to render a nickel (Ni) dragon. To obtain the <code>eta</code> and <code>k</code> values I used the <a href="https://refractiveindex.info/">website</a> given in the instruction. I entered the 3 different wavelengths for RGB colors and obtained the following values:</p>
+    <p><code>eta</code></p>
+    <ul>
+      <li>Red (wavelength = 650nm): 1.9900</li>
+      <li>Blue (wavelength = 473nm): 1.7832</li>
+      <li>Green (wavelength = 532nm): 1.8775</li>
+    </ul>
+    <p><code>k</code></p>
+    <ul>
+      <li>Red (wavelength = 650nm): 4.2086</li>
+      <li>Blue (wavelength = 473nm): 3.1028</li>
+      <li>Green (wavelength = 532nm): 3.4946</li>
+    </ul>
+    <p><code>alpha=0.5</code></p>
+    </p>
+    <p>The image obtained is the following using 128 samples per pixel, 1 samples per light, and a maximum number of bounces of 5:</p>
+    <div align="middle">
+      <table style="width=100%">
+        <tr>
+          <td>
+            <img src="images/nickel.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>dae/sky/CBdragon_microfacet_au.dae</code> rendered using Nickel (Ni) microfacet.</figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+    
+    <h2 align="middle">Part 3: Environment Light</h2>
+    <p>I then generated the <code>probability_debug.png</code> file for the <code>field.exr</code> file using the <code>save_probability_debug()</code> helper function after initializing my probability distributions:</p>
+    <div align="middle">
+      <table style="width=100%">
+        <tr>
+          <td>
+            <img src="images/probability_debug.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>probability_debug.png</code> of <code>exr/field.exr</code>.</figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+    
+    <p>I then used the <code>bunny_unlit.dae</code> scene and the <code>field.exr</code> file and rendered two pictures, one with uniform sampling and one with importance sampling. I used 4 samples per pixel and 64 samples per light in each. I also set the maximum number of bounces to 5.</p>
+    <div align="middle">
+      <table style="width=100%">
+        <tr>
+          <td>
+            <img src="images/bunny_unlit_field_uniform.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>bunny_unlit.dae</code> scene with <code>field.exr</code> using uniform sampling.</figcaption>
+          </td>
+          <td>
+            <img src="images/bunny_unlit_field_IS.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>bunny_unlit.dae</code> scene with <code>field.exr</code> using importance sampling.</figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <p>We can see that by using uniform sampling the image of the unlit bunny is slightly more noisy when using uniform sampling compared to importance sampling. In uniform sampling I am simply generating a random direction on the sphere and then look up the radiance value in the texture map using bilinear interpolation. In importance sampling, we are biasing the selection of sampled direction for which incoming radiance is large as we are making the assumption that most of the energy by an environment light is concentrated in the region towards bright light source. Importance sampling will therefore reduce noise for environment lights with large variations in incoming light intensities as we are optimizing our sampling technique to sample towards the areas that requires more samples.</p>
+    
+    <p>I then used the <code>bunny_microfacet_cu_unlit.dae</code> and the <code>field.exr</code> file and rendered two pictures, one with uniform sampling and one with importance sampling. I used 4 samples per pixel and 64 samples per light in each:</p>
+    <div align="middle">
+      <table style="width=100%">
+        <tr>
+          <td>
+            <img src="images/bunny_cu_field_uniform.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>bunny_microfacet_cu_unlit.dae</code> scene with <code>field.exr</code> using uniform sampling.</figcaption>
+          </td>
+          <td>
+            <img src="images/bunny_cu_field_IS.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>bunny_microfacet_cu_unlit.dae</code> scene with <code>field.exr</code> using importance sampling.</figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+    
+    <p>Using uniform sampling the image of the bunny seems to be slightly more noisy when using uniform sampling compared to importance sampling.</p>
+    
+    <h2 align="middle">Part 4: Depth of Field</h2>
+    <p>I generated a "focus stack" where I focused at 4 visibly different depths through a scene using 64 samples per pixel, 4 samples per light, and a maximum number of bounces of 8 (the <code>lensRadius</code> is fixed to 0.0883883):</p>
+    <div align="middle">
+      <table style="width=100%">
+        <tr>
+          <td>
+            <img src="images/part1dragon15.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>CBdragon.dae</code> scene with <code>focalDistance = 1.5</code></figcaption>
+          </td>
+          <td>
+            <img src="images/dragonFD0883883.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>CBdragon.dae</code> scene with <code>focalDistance = 1.7</code></figcaption>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <img src="images/part1dragon2.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>CBdragon.dae</code> scene with <code>focalDistance = 2.0</code></figcaption>
+          </td>
+          <td>
+            <img src="images/part1dragon25.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>CBdragon.dae</code> scene with <code>focalDistance = 2.5</code></figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+    
+    <p>Here is a sequence of 4 pictures with visibly different aperture sizes, all focused at the same point in a scene using 64 samples per pixel, 4 samples per light, and a maximum number of bounces of 8 (the focal distance is fixed to 1.7):</p>
+    <div align="middle">
+      <table style="width=100%">
+        <tr>
+          <td>
+            <img src="images/dragonFD0.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>CBdragon.dae</code> scene with <code>lensRadius = 0.0</code></figcaption>
+          </td>
+          <td>
+            <img src="images/dragonFD0883883.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>CBdragon.dae</code> scene with <code>lensRadius = 0.0883883</code></figcaption>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <img src="images/dragonFD03.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>CBdragon.dae</code> scene with <code>lensRadius = 0.3</code></figcaption>
+          </td>
+          <td>
+            <img src="images/dragonFD6.png" align="middle" width="400px"/>
+            <figcaption align="middle"><code>CBdragon.dae</code> scene with <code>lensRadius = 0.6</code></figcaption>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <h2 align="middle">Part 5: Shaders</h2>
+        <p><a href="gl/index.html">Link to my gl directory!</a></p>
+        <p>In this part I implemented some custom shaders using GLSL. A shader program is an efficient algorithm often run on the GPU to render parts of the graphics pipeline. The position and color of each vertex or pixel on the screen can be edited in a shader program on the fly to render an image. Shaders can be coded in GLSL (which is very similar to C).</p>
+        <p>In this part I coded vertex shaders and fragment shaders. A vertex shader specifies the position and normal vector of each vertices in the scene. It can apply some transformations to these vertices but then needs to specify the final position in <code>gl_Position</code>. A fragment shader is the piece of program that is responsible for coloring the fragments generated during rasterization (in other words given by the vertex shader). In other words, a fragment shader can make a texture lookup to get the surface material for each fragment (also called geometric attributes) in the scene. The colors are specified in the <code>gl_FragColor</code> variable.</p>
+        <p>The Blinn-Phong shading model is a shading model made out of three different components: an ambient term, a diffuse term, and a specular term. By weighting all of these terms, the shading model can create a material made with these characteristics. The reflected ambient light of a Blinn-Phong model can be calculated as followed:</p>
+        \[
+        \begin{align}
+        L&=L_a+L_d+L_s\\
+        &=k_aI_a+k_d\frac{I}{r^2}max(0, n \cdot l)+k_s\frac{I}{r^2}max(0, n \cdot h)^p
+        \end{align}
+        \]
+        <p>$k_a$, $k_d$, $k_s$, $I_a$, $p$ are all paramaters that can be changed to weight the ambient light component, specular reflection component, and the diffuse lighting.</p>
+        
+        <p>The following are screenshots of my Blinn-Phong shader outputting only the ambient component, a screen shot only outputting the diffuse component, a screen shot only outputting the specular component, and one using the entire Blinn-Phong model:</p>
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/ambient.png" align="middle" width="400px"/>
+                <figcaption align="middle">Blinn-Phong shader outputting only the ambient.</figcaption>
+              </td>
+              <td>
+                <img src="images/diffuse.png" align="middle" width="400px"/>
+                <figcaption align="middle">Blinn-Phong shader outputting only the diffuse.</figcaption>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <img src="images/specular.png" align="middle" width="400px"/>
+                <figcaption align="middle">Blinn-Phong shader outputting only the specular.</figcaption>
+              </td>
+              <td>
+                <img src="images/all.png" align="middle" width="400px"/>
+                <figcaption align="middle">Blinn-Phong shader outputting all 3 components.</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+        
+        <p>The following is a screenshot of my texture mapping shader using my own custom texture by modifying <code>src/renderers/t3-renderer</code></p>:
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/textureMapShader.png" align="middle" width="400px"/>
+                <figcaption align="middle">Texture Mapping shader.</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+        
+        <p>The following are screenshots representing my bump mapping shader and my displacement mapping shader:</p>
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/bump.png" align="middle" width="400px"/>
+                <figcaption align="middle">Bump Mapping.</figcaption>
+              </td>
+              <td>
+                <img src="images/displacement.png" align="middle" width="400px"/>
+                <figcaption align="middle">Displacement Mapping.</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+        
+        <p>In bump mapping I am only modifying the normal vector of each vertex so that the fragment shader gives the impression that there are bumps (even if the position of each vertices is the same). To compute the local normal vector, I look at the change in $u$ and $v$ for each fragment in the scene. A height map is used to comute the height of a given texture coordinate $u$ and $v$. In my case I used the red color of my texture as the function returning the height map. So the red parts of my texture will affect how the normal vectors will be.</p>
+        
+        <p>In the displacement mapping, I am modifying the position of each vertex according to a height map. Therefore in displacement mapping I am both modifying the normal vectors of each fragment and the position of each fragment.</p>
+        
+        <p>From the 4 images above, we can see that the bump mapping gives the illusion that there are bumps on the object. The displacement mapping has bumps that are much more apparent as the position of the vertices are actually changed (not only the normals).</p>
+        
+        <p>By modifying the number of vertical and horizontal components in <code>t4-1-renderer.js</code> and <code>t4-2-renderer.js</code> we can see that decreasing the number of vertical components produces a texture image that is more blurry in the vertical direction (as there are less samples in the vertical direction). Increasing the number of vertical components makes the displacement slightly more detailed in the vertical direction. Similarly decreasing the number of horizontal components produces a much less detailed image in the horizontal direction. Increasing the number of components in the horizontal direction makes the texture image slightly more detailed in the horizontal direction. Changing the vertical and horizontal components changes both the texture and as a result the normal (and position of vertices for displacement).</p>
+        
+        <p>These are screenshots of my experiements of changing the horizontal and vertical component: </p>
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/50b1.png" align="middle" width="400px"/>
+                <figcaption align="middle">Bump mapping horizontal component of 50.</figcaption>
+              </td>
+              <td>
+                <img src="images/1000b1.png" align="middle" width="400px"/>
+                <figcaption align="middle">Bump mapping horizontal component of 1000.</figcaption>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <img src="images/50b2.png" align="middle" width="400px"/>
+                <figcaption align="middle">Bump mapping vertical component of 50.</figcaption>
+              </td>
+              <td>
+                <img src="images/1000b2.png" align="middle" width="400px"/>
+                <figcaption align="middle">Bump mapping vertical component of 1000.</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+        
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/50d1.png" align="middle" width="400px"/>
+                <figcaption align="middle">Displacement mapping horizontal component of 50.</figcaption>
+              </td>
+              <td>
+                <img src="images/1000d1.png" align="middle" width="400px"/>
+                <figcaption align="middle">Displacement mapping horizontal component of 1000.</figcaption>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <img src="images/50d2.png" align="middle" width="400px"/>
+                <figcaption align="middle">Displacement mapping vertical component of 50.</figcaption>
+              </td>
+              <td>
+                <img src="images/1000d2.png" align="middle" width="400px"/>
+                <figcaption align="middle">Displacement mapping vertical component of 1000.</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+        <p>We can see that in bump mapping increasing and decreasing the horizontal and vertical component seems to be making a larger difference in the change of height of the bumps compared to displacement mapping. This may be due to the fact that in bump mapping only the normals are changed and as a result making a small change makes a big difference. In displacment mapping there is always the position of vertices and normals that are contributing and as a result the sphere will have some slight bumps that are more apparent even when the number of components is small. Thefore, for a small horizontal component the bump mapping will have a lot less depth than in displacement mapping. To summarize, changing the vertical and horizontal component creates the illusion of a greater change of depth for bump mapping compared to displacement mapping.</p>
+        
+        <p>In my custom shader, I decided to map a cube map to a sphere:</p>
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/my.png" align="middle" width="400px"/>
+                <figcaption align="middle">Texture Mapping shader.</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+        <p>I simply created a cube texture using <code>THREE.CubeTextureLoader()</code>, I then loaded the cube texture given in the textures folder. I then used <code>textureCube</code> to map the texture to my sphere in the frag file. The vert file is the same as the one from the texture mapping shader.</p>
+</div>
+</body>
+</html>
+
+
+
+
